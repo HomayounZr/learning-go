@@ -4,6 +4,9 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
 type Book struct {
@@ -12,13 +15,18 @@ type Book struct {
 	Author string `json:"author"`
 }
 
-var books = []Book{
-	{ID: "1", Title: "Harry Potter", Author: "J. K. Rowling"},
-	{ID: "2", Title: "Lord of The Rings", Author: "J. R. R. Tolkien"},
-	{ID: "3", Title: "The Wizard of Oz", Author: "L. Frank Baum"},
-}
+var db *gorm.DB
 
 func main() {
+	var err error
+	db, err = gorm.Open(sqlite.Open("test.db"), &gorm.Config{})
+
+	if err != nil {
+		panic("faile to connect to database")
+	}
+
+	db.AutoMigrate(&Book{})
+
 	r := gin.New()
 	r.GET("/", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
@@ -36,7 +44,15 @@ func main() {
 }
 
 func listBookHandler(c *gin.Context) {
-	c.JSON(http.StatusOK, books)
+	var books []Book
+
+	if result := db.Find(&books); result.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": result.Error.Error(),
+		})
+		return
+	}
+	c.JSON(http.StatusOK, &books)
 }
 
 func createBookHandler(c *gin.Context) {
@@ -48,18 +64,24 @@ func createBookHandler(c *gin.Context) {
 		})
 	}
 
-	books = append(books, book)
-	c.JSON(http.StatusOK, book)
+	if result := db.Create(&book); result.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": result.Error.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, &book)
 }
 
 func deleteBookHandler(c *gin.Context) {
 	id := c.Param("id")
 
-	for i, a := range books {
-		if a.ID == id {
-			books = append(books[:i], books[i+1:]...)
-			break
-		}
+	if result := db.Delete(&Book{}, id); result.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": result.Error.Error(),
+		})
+		return
 	}
 
 	c.Status(http.StatusNoContent)
