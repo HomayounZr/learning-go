@@ -1,9 +1,12 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+
+	"strings"
 
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -52,6 +55,15 @@ func main() {
 }
 
 func (h *Handler) listBookHandler(c *gin.Context) {
+	auth := c.Request.Header.Get("Authorization")
+
+	token := strings.TrimPrefix(auth, "Bearer ")
+
+	if err := validateToken(token); err != nil {
+		c.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+
 	var books []Book
 
 	if result := h.db.Find(&books); result.Error != nil {
@@ -64,6 +76,15 @@ func (h *Handler) listBookHandler(c *gin.Context) {
 }
 
 func (h *Handler) createBookHandler(c *gin.Context) {
+	auth := c.Request.Header.Get("Authorization")
+
+	token := strings.TrimPrefix(auth, "Bearer ")
+
+	if err := validateToken(token); err != nil {
+		c.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+
 	var book Book
 
 	if err := c.ShouldBindJSON(&book); err != nil {
@@ -83,6 +104,15 @@ func (h *Handler) createBookHandler(c *gin.Context) {
 }
 
 func (h *Handler) deleteBookHandler(c *gin.Context) {
+	auth := c.Request.Header.Get("Authorization")
+
+	token := strings.TrimPrefix(auth, "Bearer ")
+
+	if err := validateToken(token); err != nil {
+		c.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+
 	id := c.Param("id")
 
 	if result := h.db.Delete(&Book{}, id); result.Error != nil {
@@ -93,4 +123,11 @@ func (h *Handler) deleteBookHandler(c *gin.Context) {
 	}
 
 	c.Status(http.StatusNoContent)
+}
+
+func validateToken(token string) error {
+	if token != "ACCESS_TOKEN" {
+		return fmt.Errorf("provided token was invalid")
+	}
+	return nil
 }
