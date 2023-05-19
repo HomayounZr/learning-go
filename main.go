@@ -45,11 +45,13 @@ func main() {
 		})
 	})
 
-	r.GET("/books", handler.listBookHandler)
+	r.POST("/login", loginHandler)
 
-	r.POST("/books", handler.createBookHandler)
+	protected := r.Group("/books", authorizationMiddleware)
 
-	r.DELETE("/books/:id", handler.deleteBookHandler)
+	protected.GET("/books", handler.listBookHandler)
+	protected.POST("/books", handler.createBookHandler)
+	protected.DELETE("/books/:id", handler.deleteBookHandler)
 
 	r.Run()
 }
@@ -125,9 +127,28 @@ func (h *Handler) deleteBookHandler(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
+func authorizationMiddleware(c *gin.Context) {
+	auth := c.Request.Header.Get("Authorization")
+
+	token := strings.TrimPrefix(auth, "Bearer ")
+
+	if err := validateToken(token); err != nil {
+		c.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+}
+
 func validateToken(token string) error {
 	if token != "ACCESS_TOKEN" {
 		return fmt.Errorf("provided token was invalid")
 	}
 	return nil
+}
+
+func loginHandler(c *gin.Context) {
+	// generate jwt token here
+
+	c.JSON(http.StatusOK, gin.H{
+		"token": "ACCESS_TOKEN",
+	})
 }
